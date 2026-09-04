@@ -1,0 +1,279 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-property-offers-api",
+    "name": "Property Offers API",
+    "description": "REST API for async offer imports, cheapest property search, and reservations.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "import_id",
+      "value": "1"
+    },
+    {
+      "key": "offer_id",
+      "value": "1"
+    }
+  ],
+  "item": [
+    {
+      "name": "Imports",
+      "item": [
+        {
+          "name": "Create import",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 202) {",
+                  "    const json = pm.response.json();",
+                  "    if (json.data && json.data.id) {",
+                  "        pm.collectionVariables.set('import_id', String(json.data.id));",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"supplier\": \"supplier-a\",\n  \"external_import_id\": \"import-2026-09-01-001\",\n  \"sent_at\": \"2026-09-01T10:00:00Z\",\n  \"offers\": [\n    {\n      \"external_id\": \"offer-a-10001\",\n      \"property\": {\n        \"code\": \"BCN-0001\",\n        \"name\": \"Apartment near Sagrada Familia\",\n        \"city\": \"Barcelona\"\n      },\n      \"check_in\": \"2026-10-10\",\n      \"check_out\": \"2026-10-15\",\n      \"max_guests\": 4,\n      \"price\": 72500,\n      \"currency\": \"EUR\",\n      \"available_units\": 2,\n      \"expires_at\": \"2026-12-31T23:59:59Z\"\n    },\n    {\n      \"external_id\": \"offer-a-10002\",\n      \"property\": {\n        \"code\": \"BCN-0002\",\n        \"name\": \"Loft in El Born\",\n        \"city\": \"Barcelona\"\n      },\n      \"check_in\": \"2026-10-10\",\n      \"check_out\": \"2026-10-15\",\n      \"max_guests\": 2,\n      \"price\": 51000,\n      \"currency\": \"EUR\",\n      \"available_units\": 1,\n      \"expires_at\": \"2026-12-31T23:59:59Z\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/imports",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "imports"
+              ]
+            },
+            "description": "Creates an import and queues processing. Expect 202. Requires seeded suppliers (supplier-a / supplier-b) and a running queue worker unless QUEUE_CONNECTION=sync."
+          },
+          "response": []
+        },
+        {
+          "name": "Create import (idempotent retry)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"supplier\": \"supplier-a\",\n  \"external_import_id\": \"import-2026-09-01-001\",\n  \"sent_at\": \"2026-09-01T10:00:00Z\",\n  \"offers\": [\n    {\n      \"external_id\": \"offer-a-10001\",\n      \"property\": {\n        \"code\": \"BCN-0001\",\n        \"name\": \"Apartment near Sagrada Familia\",\n        \"city\": \"Barcelona\"\n      },\n      \"check_in\": \"2026-10-10\",\n      \"check_out\": \"2026-10-15\",\n      \"max_guests\": 4,\n      \"price\": 72500,\n      \"currency\": \"EUR\",\n      \"available_units\": 2,\n      \"expires_at\": \"2026-12-31T23:59:59Z\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/imports",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "imports"
+              ]
+            },
+            "description": "Same supplier + external_import_id. Should return the existing import without creating duplicates or re-queueing."
+          },
+          "response": []
+        },
+        {
+          "name": "Get import status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/imports/{{import_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "imports",
+                "{{import_id}}"
+              ]
+            },
+            "description": "Returns current async import state. import_id is set automatically after Create import."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Properties",
+      "item": [
+        {
+          "name": "Search properties",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    if (json.data && json.data.length && json.data[0].best_offer) {",
+                  "        pm.collectionVariables.set('offer_id', String(json.data[0].best_offer.id));",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/properties?city=Barcelona&check_in=2026-10-10&check_out=2026-10-15&guests=2&page=1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "properties"
+              ],
+              "query": [
+                {
+                  "key": "city",
+                  "value": "Barcelona"
+                },
+                {
+                  "key": "check_in",
+                  "value": "2026-10-10"
+                },
+                {
+                  "key": "check_out",
+                  "value": "2026-10-15"
+                },
+                {
+                  "key": "guests",
+                  "value": "2"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "per_page",
+                  "value": "15",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Returns properties with the cheapest actual offer. Saves best_offer.id into offer_id."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Reservations",
+      "item": [
+        {
+          "name": "Create reservation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_reference\": \"web-order-9f782b1c\",\n  \"customer_name\": \"John Smith\",\n  \"customer_email\": \"john@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/offers/{{offer_id}}/reservations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "offers",
+                "{{offer_id}}",
+                "reservations"
+              ]
+            },
+            "description": "Expect 201. Use a unique client_reference on each successful attempt. Second booking of the last unit should return 409."
+          },
+          "response": []
+        },
+        {
+          "name": "Create reservation (conflict / last unit)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_reference\": \"web-order-second-attempt\",\n  \"customer_name\": \"Jane Doe\",\n  \"customer_email\": \"jane@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/offers/{{offer_id}}/reservations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "offers",
+                "{{offer_id}}",
+                "reservations"
+              ]
+            },
+            "description": "Call after reserving the last available unit. Expect 409."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
