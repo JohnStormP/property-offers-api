@@ -7,6 +7,8 @@ use App\Jobs\ProcessImportJob;
 use App\Models\Import;
 use App\Models\Offer;
 use App\Models\Property;
+use App\Models\Supplier;
+use App\Services\ImportService;
 use Database\Seeders\SupplierSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -157,6 +159,49 @@ class ImportTest extends TestCase
                     'completed_at',
                 ],
             ]);
+    }
+
+    public function test_stale_processing_import_can_be_reclaimed(): void
+    {
+        $import = Import::factory()->create([
+            'supplier_id' => Supplier::query()->where('code', 'supplier-a')->value('id'),
+            'status' => ImportStatus::Processing,
+            'payload' => $this->importPayload()['offers'],
+            'total_offers' => 1,
+            'processed_offers' => 0,
+        ]);
+
+        Import::query()->whereKey($import->id)->update([
+            'updated_at' => now()->subHour(),
+        ]);
+
+        app(ImportService::class)->process($import->fresh());
+
+        $import->refresh();
+
+        $this->assertSame(ImportStatus::Completed, $import->status);
+        $this->assertSame(1, $import->processed_offers);
+        $this->assertDatabaseHas('offers', [
+            'external_id' => 'offer-a-10001',
+            'price' => 72500,
+        ]);
+    }
+
+    public function test_fresh_processing_import_is_not_reclaimed(): void
+    {
+        $import = Import::factory()->create([
+            'supplier_id' => Supplier::query()->where('code', 'supplier-a')->value('id'),
+            'status' => ImportStatus::Processing,
+            'payload' => $this->importPayload()['offers'],
+            'total_offers' => 1,
+            'processed_offers' => 0,
+            'updated_at' => now(),
+        ]);
+
+        app(ImportService::class)->process($import->fresh());
+
+        $this->assertSame(ImportStatus::Processing, $import->fresh()->status);
+        $this->assertSame(0, Offer::query()->count());
     }
 
     /**
